@@ -6,7 +6,7 @@
 
 ## :heavy_check_mark: Успешное вычисление
 ```bash
-curl --location 'http://localhost:8080/api/v1/calculate' \
+curl --location 'https://hseastro.space/api/v1/calculate' \
 --header 'Content-Type: application/json' \
 --data '{
   "expression": "2+2*2"
@@ -23,7 +23,7 @@ curl --location 'http://localhost:8080/api/v1/calculate' \
 Запрос с некорректным выражением (например, содержится буква `a`):
 
 ```bash
-curl --location 'http://localhost:8080/api/v1/calculate' \
+curl --location 'https://hseastro.space/api/v1/calculate' \
 --header 'Content-Type: application/json' \
 --data '{
   "expression": "2+a"
@@ -39,7 +39,7 @@ curl --location 'http://localhost:8080/api/v1/calculate' \
 ## :x: Ошибка 500 (Internal Server Error)
 Запрос, в котором произойдёт непредвиденная ошибка (например, деление на ноль):
 ```bash
-curl --location 'http://localhost:8080/api/v1/calculate' \
+curl --location 'https://hseastro.space/api/v1/calculate' \
 --header 'Content-Type: application/json' \
 --data '{
   "expression": "10/0"
