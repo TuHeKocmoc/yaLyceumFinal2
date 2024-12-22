@@ -1,8 +1,10 @@
-package main
+package handler
 
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc"
 )
 
 type Output struct {
@@ -26,7 +28,7 @@ func CalcHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// проверяем валидность введенных данных
-	check := checkInput(request.Expression)
+	check := calc.CheckInput(request.Expression)
 	if !check {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		output := Err{Error: "Expression is not valid"}
@@ -34,7 +36,7 @@ func CalcHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// считаем результат
-	result, err := Calc(request.Expression)
+	result, err := calc.Calc(request.Expression)
 	if err != nil {
 		output := Err{Error: "Internal server error"}
 		w.WriteHeader(http.StatusInternalServerError)
@@ -44,10 +46,4 @@ func CalcHandler(w http.ResponseWriter, r *http.Request) {
 	// отправляем результат
 	output := Output{Result: result}
 	json.NewEncoder(w).Encode(output)
-}
-
-func main() {
-	// запускаем сервер
-	http.HandleFunc("/api/v1/calculate", CalcHandler)
-	http.ListenAndServe(":8080", nil)
 }
