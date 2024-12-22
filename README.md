@@ -46,11 +46,11 @@
 1. Убедитесь, что у вас установлен Go (версия 1.20 или выше).
 2. Склонируйте репозиторий:
    ```bash
-   git clone https://github.com/username/calcapi.git
+   git clone https://github.com/TuHeKocmoc/yaLyceumFinal2.git
    ```
 3. Перейдите в директорию с проектом:
    ```bash
-   cd calcapi
+   cd yaLyceumFinal2
    ```
 4. Запустите команду:
    ```bash
