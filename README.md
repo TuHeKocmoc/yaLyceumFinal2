@@ -1,10 +1,10 @@
 # README.md
 
-# Проект "CalcAPI" – простой калькулятор на Go $begin:math:display$!Go$end:math:display$
+# Проект "CalcAPI" – простой калькулятор на Go \[![Go](https://img.shields.io/badge/Go-1.20-blue.svg)\]
 
 Добро пожаловать в репозиторий **CalcAPI**!  
 Это мини-проект на Go, который предоставляет HTTP-эндпоинт для вычисления математического выражения.  
-Выражение может содержать цифры, операции $begin:math:text$+\\-\\*/$end:math:text$ и круглые скобки.
+Выражение может содержать цифры, операции  \(+\-\*/\) и круглые скобки.
 
 ## :globe_with_meridians: Доступность онлайн
 Проект доступен по адресу: [https://hseastro.space](https://hseastro.space)
