@@ -182,16 +182,13 @@ func postResultToOrchestrator(taskID int, result float64) error {
 func compute(a, b interface{}, op string) (float64, error) {
 	switch op {
 	case "FULL":
-		// Если это "FULL" — мы ожидаем, что a.(string) содержит полное выражение
 		exprStr, ok := a.(string)
 		if !ok {
 			return 0, fmt.Errorf("compute FULL: Arg1 is not a string")
 		}
-		// Вызвать ваш парсер/калькулятор
 		return calc.Calc(exprStr)
 
 	case "+", "-", "*", "/":
-		// Здесь a, b — должны быть float64
 		fa, ok := a.(float64)
 		if !ok {
 			return 0, fmt.Errorf("arg1 is not a float64")

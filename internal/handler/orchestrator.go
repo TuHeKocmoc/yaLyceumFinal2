@@ -10,6 +10,7 @@ import (
 
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc" // если хотим переиспользовать CheckInput
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/model"
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/planner"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
 )
 
@@ -74,13 +75,16 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if expr.Raw != "" {
-		_, err = repository.CreateTask(expr.ID, "FULL", nil, nil)
+		finalTaskID, err := planner.PlanTasks(expr.ID, expr.Raw)
 		if err != nil {
-			http.Error(w, "cannot create task", http.StatusInternalServerError)
+			http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
 		expr.Status = model.StatusInProgress
 		_ = repository.UpdateExpression(expr)
+
+		expr.FinalTaskID = finalTaskID
+
 	}
 
 	resp := responseCreateExpression{ID: expr.ID}
@@ -144,7 +148,6 @@ func HandleGetExpressionByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// 4) GET /internal/task
 type responseTask struct {
 	Task struct {
 		ID            int         `json:"id"`
@@ -170,6 +173,7 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no task available", http.StatusNotFound)
 		return
 	}
+
 	task.Status = model.TaskStatusInProgress
 	if err := repository.UpdateTask(task); err != nil {
 		http.Error(w, "failed to update task", http.StatusInternalServerError)
@@ -178,9 +182,8 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 
 	operationTime := getOperationTime(task.Op)
 
-	var arg1, arg2 interface{}
-	arg1 = 0.0
-	arg2 = 0.0
+	var arg1 interface{}
+	var arg2 interface{}
 
 	if task.Op == "FULL" {
 		expr, err := repository.GetExpressionByID(task.ExpressionID)
@@ -194,6 +197,32 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 		}
 		arg1 = expr.Raw
 		arg2 = nil
+	} else {
+		if task.Arg1Value != nil {
+			arg1 = *task.Arg1Value
+		} else if task.Arg1TaskID != nil {
+			depTask, _ := repository.GetTaskByID(*task.Arg1TaskID)
+			if depTask != nil && depTask.Result != nil {
+				arg1 = *depTask.Result
+			} else {
+				arg1 = 0.0
+			}
+		} else {
+			arg1 = 0.0
+		}
+
+		if task.Arg2Value != nil {
+			arg2 = *task.Arg2Value
+		} else if task.Arg2TaskID != nil {
+			depTask, _ := repository.GetTaskByID(*task.Arg2TaskID)
+			if depTask != nil && depTask.Result != nil {
+				arg2 = *depTask.Result
+			} else {
+				arg2 = 0.0
+			}
+		} else {
+			arg2 = 0.0
+		}
 	}
 
 	resp := responseTask{}
@@ -255,6 +284,7 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 
 	task.Status = model.TaskStatusDone
 	task.Result = &resultFloat64
+
 	if err := repository.UpdateTask(task); err != nil {
 		http.Error(w, "failed to update task", http.StatusInternalServerError)
 		return
@@ -270,10 +300,40 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 		expr.Result = &resultFloat64
 		expr.Status = model.StatusDone
 		_ = repository.UpdateExpression(expr)
+
+	} else {
+		if allTasksDone(expr) {
+			lastTaskID := expr.Tasks[len(expr.Tasks)-1]
+			finalTask, err := repository.GetTaskByID(lastTaskID)
+			if err != nil {
+				http.Error(w, "error fetching final task", http.StatusInternalServerError)
+				return
+			}
+			if finalTask != nil && finalTask.Result != nil {
+				expr.Result = finalTask.Result
+			}
+			expr.Status = model.StatusDone
+			if err := repository.UpdateExpression(expr); err != nil {
+				http.Error(w, "failed to update expression", http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"status":"ok"}`)
+}
+
+func allTasksDone(expr *model.Expression) bool {
+	for _, taskID := range expr.Tasks {
+		t, ok := repository.GetTaskByID(taskID)
+		if ok == nil && t != nil {
+			if t.Status != model.TaskStatusDone {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func getOperationTime(op string) int {

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc"
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/model"
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/planner"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
 )
 
@@ -65,13 +67,14 @@ func HandleFrontAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	expr := r.FormValue("expression")
 	if expr == "" {
 		http.Error(w, "empty expression", http.StatusBadRequest)
 		return
 	}
-	check := calc.CheckInput(expr)
-	if !check {
+
+	if !calc.CheckInput(expr) {
 		http.Error(w, "expression is not valid", http.StatusUnprocessableEntity)
 		return
 	}
@@ -81,13 +84,14 @@ func HandleFrontAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cannot create expression", http.StatusInternalServerError)
 		return
 	}
-	_, err = repository.CreateTask(newExpr.ID, "FULL", nil, nil)
+
+	_, err = planner.PlanTasks(newExpr.ID, expr)
 	if err != nil {
-		http.Error(w, "cannot create task", http.StatusInternalServerError)
+		http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
-	newExpr.Status = "IN_PROGRESS"
+	newExpr.Status = model.StatusInProgress
 	_ = repository.UpdateExpression(newExpr)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)

@@ -17,21 +17,25 @@ const (
 )
 
 type Expression struct {
-	ID     string   `json:"id"`
-	Raw    string   `json:"raw"`
-	Status string   `json:"status"`
-	Result *float64 `json:"result"`
-	Tasks  []int    `json:"tasks"`
+	ID          string   `json:"id"`
+	Raw         string   `json:"raw"`
+	Status      string   `json:"status"`
+	Result      *float64 `json:"result"`
+	Tasks       []int    `json:"tasks"`
+	FinalTaskID int      `json:"final_task_id,omitempty"`
 }
 
 type Task struct {
 	ID           int    `json:"id"`
 	ExpressionID string `json:"expression_id"`
 
-	Arg1   *float64 `json:"arg1,omitempty"`
-	Arg2   *float64 `json:"arg2,omitempty"`
-	Op     string   `json:"op"`
-	Result *float64 `json:"result"`
+	Arg1Value  *float64 `json:"arg1_value,omitempty"`
+	Arg1TaskID *int     `json:"arg1_task_id,omitempty"`
+
+	Arg2Value  *float64 `json:"arg2_value,omitempty"`
+	Arg2TaskID *int     `json:"arg2_task_id,omitempty"`
+	Op         string   `json:"op"`
+	Result     *float64 `json:"result"`
 
 	Status string `json:"status"`
 }

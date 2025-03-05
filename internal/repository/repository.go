@@ -69,33 +69,33 @@ func UpdateExpression(e *model.Expression) error {
 	return nil
 }
 
-func CreateTask(expressionID string, op string, arg1, arg2 *float64) (*model.Task, error) {
-	mu.Lock()
-	defer mu.Unlock()
+// func CreateTask(expressionID string, op string, arg1, arg2 *float64) (*model.Task, error) {
+// 	mu.Lock()
+// 	defer mu.Unlock()
 
-	expr, ok := expressionsMap[expressionID]
-	if !ok {
-		return nil, fmt.Errorf("no expression with id=%s", expressionID)
-	}
+// 	expr, ok := expressionsMap[expressionID]
+// 	if !ok {
+// 		return nil, fmt.Errorf("no expression with id=%s", expressionID)
+// 	}
 
-	taskAutoID++
-	taskID := taskAutoID
+// 	taskAutoID++
+// 	taskID := taskAutoID
 
-	task := &model.Task{
-		ID:           taskID,
-		ExpressionID: expressionID,
-		Op:           op,
-		Arg1:         arg1,
-		Arg2:         arg2,
-		Status:       model.TaskStatusWaiting,
-	}
-	tasksMap[taskID] = task
+// 	task := &model.Task{
+// 		ID:           taskID,
+// 		ExpressionID: expressionID,
+// 		Op:           op,
+// 		Arg1:         arg1,
+// 		Arg2:         arg2,
+// 		Status:       model.TaskStatusWaiting,
+// 	}
+// 	tasksMap[taskID] = task
 
-	expr.Tasks = append(expr.Tasks, taskID)
-	expressionsMap[expressionID] = expr
+// 	expr.Tasks = append(expr.Tasks, taskID)
+// 	expressionsMap[expressionID] = expr
 
-	return task, nil
-}
+// 	return task, nil
+// }
 
 func GetTaskByID(id int) (*model.Task, error) {
 	mu.Lock()
@@ -124,9 +124,66 @@ func GetNextWaitingTask() (*model.Task, error) {
 	defer mu.Unlock()
 
 	for _, task := range tasksMap {
-		if task.Status == model.TaskStatusWaiting {
-			return task, nil
+		if task.Status != model.TaskStatusWaiting {
+			continue
 		}
+
+		if task.Arg1TaskID != nil {
+			depTask := tasksMap[*task.Arg1TaskID]
+			if depTask == nil || depTask.Status != model.TaskStatusDone {
+				continue
+			}
+		}
+
+		if task.Arg2TaskID != nil {
+			depTask := tasksMap[*task.Arg2TaskID]
+			if depTask == nil || depTask.Status != model.TaskStatusDone {
+				continue
+			}
+		}
+
+		return task, nil
 	}
+
 	return nil, nil
+}
+
+func CreateTaskWithArgs(
+	expressionID string,
+	op string,
+	arg1Value *float64, arg1TaskID *int,
+	arg2Value *float64, arg2TaskID *int,
+) (*model.Task, error) {
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	expr, ok := expressionsMap[expressionID]
+	if !ok {
+		return nil, fmt.Errorf("no expression with id=%s", expressionID)
+	}
+
+	taskAutoID++
+	taskID := taskAutoID
+
+	task := &model.Task{
+		ID:           taskID,
+		ExpressionID: expressionID,
+		Op:           op,
+
+		Arg1Value:  arg1Value,
+		Arg1TaskID: arg1TaskID,
+
+		Arg2Value:  arg2Value,
+		Arg2TaskID: arg2TaskID,
+
+		Status: model.TaskStatusWaiting, // пусть стартует как WAITING
+	}
+	tasksMap[taskID] = task
+
+	// Добавим ID задачи в список задач у выражения
+	expr.Tasks = append(expr.Tasks, taskID)
+	expressionsMap[expressionID] = expr // обновим запись
+
+	return task, nil
 }

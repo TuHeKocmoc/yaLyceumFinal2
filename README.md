@@ -111,21 +111,22 @@
 ```
 yaLyceumFinal2/
 ├── cmd/
-│   ├── main.go         # Точка входа для "оркестратора"
+│   ├── main.go            # Точка входа для "оркестратора" (основной сервер)
 │   └── agent/
-│       └── main.go     # Точка входа для "агента"
+│       └── main.go        # Точка входа для "агента" (который берёт задачи и считает)
 ├── internal/
-│   ├── model/          # Определения структур (Expression, Task, статусы)
-│   ├── repository/     # In-memory репозиторий (хранение Expression/Task)
-│   ├── handler/        # HTTP-хендлеры (оркестратор и front-end)
-│   └── calc/           # Старый модуль вычислений (Calc, Compute, ...)
+│   ├── model/             # Определения структур (Expression, Task, статусы)
+│   ├── repository/        # In-memory репозиторий (хранение Expression/Task)
+│   ├── handler/           # HTTP-хендлеры (оркестратор и front-end)
+│   ├── calc/              # Старый модуль вычислений (Calc, Compute, ...)
+│   └── planner/           # Планировщик (разбивка выражений на задачи)
 ├── web/
-│   ├── index.html      # Шаблон главной страницы
-│   ├── expression.html # шаблон отдельной страницы
+│   ├── index.html         # Шаблон главной страницы (front-end)
+│   ├── expression.html    # Шаблон отдельной страницы (если нужно)
 │   └── static/
-│       ├── style.css   # CSS-стили
-│       └── main.js     # JS с live-обновлением
-├── EXAMPLE.md          # Примеры использования API
-├── README.md           # Описание проекта (текущий файл)
-└── go.mod              # Go-модуль
+│       ├── style.css      # CSS-стили
+│       └── main.js        # JS, напр. live-обновление статусов
+├── EXAMPLE.md             # Примеры использования API (curl-запросы и т.д.)
+├── README.md              # Текущее описание проекта
+└── go.mod                 # Файл модуля Go
 ```
