@@ -158,3 +158,12 @@ func CreateTaskWithArgs(
 
 	return task, nil
 }
+
+func Reset() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	expressionsMap = make(map[string]*model.Expression)
+	tasksMap = make(map[int]*model.Task)
+	taskAutoID = 0
+}
