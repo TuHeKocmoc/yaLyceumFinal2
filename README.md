@@ -79,11 +79,11 @@
    git clone https://github.com/TuHeKocmoc/yaLyceumFinal2.git
    ```
 3. Перейдите в директорию:
-  ```
+  ```bash
   cd yaLyceumFinal2
   ```
 4. Запустите оркестратор (сервер), выполнив:
-  ```
+  ```bash
   go run ./cmd/main.go
   ```
   По умолчанию он слушает порт 8080.
@@ -91,12 +91,11 @@
 ## :computer: Как запустить агента
 
 1. 	В отдельном терминале (или на другой «машине»):
-  ``` 
+  ```bash
   cd yaLyceumFinal2 
   ```
-
 2. Запустите:
-  ```
+  ```bash
   COMPUTING_POWER=2 go run ./cmd/agent/main.go
   ```
 
@@ -113,7 +112,6 @@ yaLyceumFinal2/
 │   ├── repository/     # In-memory репозиторий (хранение Expression/Task)
 │   ├── handler/        # HTTP-хендлеры (оркестратор)
 │   └── calc/           # Старый модуль вычислений (Calc, Compute, ...)
-
 ├── EXAMPLE.md          # Примеры использования API
 ├── README.md           # Описание проекта (текущий файл)
 └── go.mod              # Go-модуль
