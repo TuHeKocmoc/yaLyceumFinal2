@@ -1,0 +1,38 @@
+<!-- web/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Calc - Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Welcome to Calc!</h1>
+
+    <div id="addForm">
+        <h2>Add new expression</h2>
+        <form method="POST" action="/front/add">
+            <label for="expr">Expression:</label>
+            <input type="text" id="expr" name="expression" placeholder="2+2*2">
+            <button type="submit">Calculate</button>
+        </form>
+    </div>
+
+    <hr>
+
+    <h2>Current expressions</h2>
+    <div id="expressionsWrapper">
+        <ul>
+          {{range .Expressions}}
+            <li>
+              <strong>{{.ID}}</strong>:
+              <em>{{.Raw}}</em> →
+              Status: {{.Status}}, Result: {{if .Result}}{{.Result}}{{else}}nil{{end}}
+            </li>
+          {{end}}
+        </ul>
+    </div>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>

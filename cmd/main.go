@@ -8,6 +8,14 @@ import (
 )
 
 func main() {
+	if err := handler.InitTemplates(); err != nil {
+		log.Fatalf("cannot init templates: %v", err)
+	}
+
+	http.HandleFunc("/", handler.HandleFrontIndex)        // GET
+	http.HandleFunc("/front/add", handler.HandleFrontAdd) // POST
+	http.HandleFunc("/expression/", handler.HandleFrontExpression)
+
 	http.HandleFunc("/api/v1/calculate", handler.HandleCreateExpression)    // POST
 	http.HandleFunc("/api/v1/expressions", handler.HandleGetAllExpressions) // GET
 	http.HandleFunc("/api/v1/expressions/", handler.HandleGetExpressionByID)
@@ -21,6 +29,9 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	fs := http.FileServer(http.Dir("./web/static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	log.Println("Starting server at :8080...")
 	err := http.ListenAndServe(":8080", nil)

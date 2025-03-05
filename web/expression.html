@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Expression info</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Expression details</h1>
+    <p>ID: {{.Expression.ID}}</p>
+    <p>Raw: {{.Expression.Raw}}</p>
+    <p>Status: {{.Expression.Status}}</p>
+    <p>Result: {{if .Expression.Result}}{{.Expression.Result}}{{else}}nil{{end}}</p>
+
+    <a href="/">Back to list</a>
+</body>
+</html>
