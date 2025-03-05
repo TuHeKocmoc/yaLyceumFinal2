@@ -77,6 +77,8 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 	if expr.Raw != "" {
 		finalTaskID, err := planner.PlanTasksWithNestedParen(expr.ID, expr.Raw)
 		if err != nil {
+			expr.Status = model.StatusError
+			_ = repository.UpdateExpression(expr)
 			http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
 			return
 		}

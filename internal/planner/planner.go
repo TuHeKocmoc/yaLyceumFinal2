@@ -166,7 +166,7 @@ func removeSpaces(s string) string {
 }
 
 func PlanTasksWithNestedParen(exprID, raw string) (int, error) {
-	expression := removeSpaces(raw)
+	expression := rewriteUnaryMinuses(removeSpaces(raw))
 
 	for strings.Contains(expression, "(") {
 		lp, rp := findDeepestParenPair(expression)
@@ -174,7 +174,7 @@ func PlanTasksWithNestedParen(exprID, raw string) (int, error) {
 			return 0, fmt.Errorf("unmatched parentheses in expression: %s", expression)
 		}
 
-		subStr := expression[lp+1 : rp] // без самих скобок
+		subStr := expression[lp+1 : rp]
 		subTaskID, err := PlanTasks(exprID, subStr)
 		if err != nil {
 			return 0, fmt.Errorf("error planning sub-expression %q: %v", subStr, err)
@@ -210,4 +210,73 @@ func findDeepestParenPair(s string) (int, int) {
 		}
 	}
 	return lpResult, rpResult
+}
+
+func rewriteUnaryMinuses(expr string) string {
+	exprRunes := []rune(expr)
+	var result []rune
+
+	i := 0
+	for i < len(exprRunes) {
+		ch := exprRunes[i]
+
+		if ch == '-' {
+			if isUnaryMinus(result) {
+				result = append(result, '(', '0', '-')
+				i++
+				startIdx := i
+				for i < len(exprRunes) {
+					if isOperator(exprRunes[i]) && exprRunes[i] != '.' {
+						break
+					}
+					if exprRunes[i] == '(' || exprRunes[i] == ')' {
+						break
+					}
+					if unicode.IsSpace(exprRunes[i]) {
+						break
+					}
+					i++
+				}
+				sub := exprRunes[startIdx:i]
+				result = append(result, sub...)
+				result = append(result, ')')
+				continue
+			} else {
+				result = append(result, ch)
+				i++
+				continue
+			}
+
+		} else {
+			// обычный символ
+			result = append(result, ch)
+			i++
+		}
+	}
+
+	return string(result)
+}
+
+func isUnaryMinus(resultSoFar []rune) bool {
+	if len(resultSoFar) == 0 {
+		return true
+	}
+	prev := resultSoFar[len(resultSoFar)-1]
+	if isOperator([]rune{prev}) ||
+		prev == '(' {
+		return true
+	}
+	return false
+}
+
+func isOperator(r interface{}) bool {
+	switch x := r.(type) {
+	case rune:
+		return x == '+' || x == '-' || x == '*' || x == '/'
+	case []rune:
+		if len(x) == 1 {
+			return isOperator(x[0])
+		}
+	}
+	return false
 }
