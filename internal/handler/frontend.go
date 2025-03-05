@@ -85,13 +85,14 @@ func HandleFrontAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = planner.PlanTasks(newExpr.ID, expr)
+	finalTaskID, err := planner.PlanTasksWithParen(newExpr.ID, expr)
 	if err != nil {
 		http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
 	newExpr.Status = model.StatusInProgress
+	newExpr.FinalTaskID = finalTaskID
 	_ = repository.UpdateExpression(newExpr)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
 )
@@ -152,4 +153,76 @@ func findOperandRight(expr string, opPos int) (*float64, *int, int, error) {
 		return nil, nil, 0, fmt.Errorf("invalid right operand: %s", rightStr)
 	}
 	return &val, nil, endPos, nil
+}
+
+func PlanTasksWithParen(exprID, raw string) (int, error) {
+	expression := removeSpaces(raw)
+
+	for {
+		lp := findInnerParentheses(expression)
+		if lp == -1 {
+			break // нет ( ) больше
+		}
+
+		rp, err := findMatchingParen(expression, lp)
+		if err != nil {
+			return 0, fmt.Errorf("unmatched parentheses: %v", err)
+		}
+
+		subStr := expression[lp+1 : rp]
+		subTaskID, err := PlanTasks(exprID, subStr)
+		if err != nil {
+			return 0, fmt.Errorf("cannot plan sub-expression: %v", err)
+		}
+
+		newPart := fmt.Sprintf("T%d", subTaskID)
+		expression = expression[:lp] + newPart + expression[rp+1:]
+	}
+
+	finalTaskID, err := PlanTasks(exprID, expression)
+	if err != nil {
+		return 0, err
+	}
+	return finalTaskID, nil
+}
+
+func findInnerParentheses(expr string) int {
+	depth := 0
+	var candidate = -1
+	for i, ch := range expr {
+		if ch == '(' {
+			depth++
+			if depth == 1 {
+				candidate = i
+			}
+		} else if ch == ')' {
+			depth--
+		}
+	}
+	return candidate
+}
+
+func findMatchingParen(expr string, lp int) (int, error) {
+	depth := 0
+	for i := lp; i < len(expr); i++ {
+		if expr[i] == '(' {
+			depth++
+		} else if expr[i] == ')' {
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		}
+	}
+	return -1, fmt.Errorf("no matching closing parenthesis")
+}
+
+func removeSpaces(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if !unicode.IsSpace(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

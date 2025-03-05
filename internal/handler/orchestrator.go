@@ -75,7 +75,7 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if expr.Raw != "" {
-		finalTaskID, err := planner.PlanTasks(expr.ID, expr.Raw)
+		finalTaskID, err := planner.PlanTasksWithParen(expr.ID, expr.Raw)
 		if err != nil {
 			http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
 			return
