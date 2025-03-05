@@ -69,34 +69,6 @@ func UpdateExpression(e *model.Expression) error {
 	return nil
 }
 
-// func CreateTask(expressionID string, op string, arg1, arg2 *float64) (*model.Task, error) {
-// 	mu.Lock()
-// 	defer mu.Unlock()
-
-// 	expr, ok := expressionsMap[expressionID]
-// 	if !ok {
-// 		return nil, fmt.Errorf("no expression with id=%s", expressionID)
-// 	}
-
-// 	taskAutoID++
-// 	taskID := taskAutoID
-
-// 	task := &model.Task{
-// 		ID:           taskID,
-// 		ExpressionID: expressionID,
-// 		Op:           op,
-// 		Arg1:         arg1,
-// 		Arg2:         arg2,
-// 		Status:       model.TaskStatusWaiting,
-// 	}
-// 	tasksMap[taskID] = task
-
-// 	expr.Tasks = append(expr.Tasks, taskID)
-// 	expressionsMap[expressionID] = expr
-
-// 	return task, nil
-// }
-
 func GetTaskByID(id int) (*model.Task, error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -177,13 +149,12 @@ func CreateTaskWithArgs(
 		Arg2Value:  arg2Value,
 		Arg2TaskID: arg2TaskID,
 
-		Status: model.TaskStatusWaiting, // пусть стартует как WAITING
+		Status: model.TaskStatusWaiting,
 	}
 	tasksMap[taskID] = task
 
-	// Добавим ID задачи в список задач у выражения
 	expr.Tasks = append(expr.Tasks, taskID)
-	expressionsMap[expressionID] = expr // обновим запись
+	expressionsMap[expressionID] = expr
 
 	return task, nil
 }

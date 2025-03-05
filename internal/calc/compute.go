@@ -21,7 +21,7 @@ func Compute(expression string) (float64, error) {
 		if strings.Contains(operators, string(char)) {
 			temp := operator
 			operator = string(char)
-			if (operator == "-" && i == 0) || firstNumEnded == true {
+			if (operator == "-" && i == 0) || firstNumEnded {
 				// fmt.Println("got in special case with i:", i, string(expression[i]))
 				// fmt.Println(operator == "-" && i == 0)
 				operator = temp
