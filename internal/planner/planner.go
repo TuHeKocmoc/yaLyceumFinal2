@@ -200,6 +200,8 @@ func findDeepestParenPair(s string) (int, int) {
 			if curDepth > maxDepth {
 				maxDepth = curDepth
 				lpCandidate = i
+			} else if curDepth == maxDepth {
+				lpCandidate = i
 			}
 		} else if ch == ')' {
 			if curDepth == maxDepth {
