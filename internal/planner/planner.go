@@ -110,7 +110,6 @@ func findFirstAddSub(expr string) int {
 	return -1
 }
 
-// (value *float64, taskID *int, startPos, err).
 func findOperandLeft(expr string, opPos int) (*float64, *int, int, error) {
 	start := opPos - 1
 	for start >= 0 && !strings.ContainsRune("+-*/", rune(expr[start])) {
@@ -250,7 +249,6 @@ func rewriteUnaryMinuses(expr string) string {
 			}
 
 		} else {
-			// обычный символ
 			result = append(result, ch)
 			i++
 		}

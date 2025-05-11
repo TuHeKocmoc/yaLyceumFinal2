@@ -17,6 +17,6 @@ func removeSpaces(s string) string {
 }
 
 func CheckInput(s string) bool {
-	re := regexp.MustCompile(`^[0-9+\-/*().]+$`) // проверяет что даны только цифры и мат символы
+	re := regexp.MustCompile(`^[0-9+\-/*().]+$`)
 	return re.MatchString(removeSpaces(s))
 }

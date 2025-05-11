@@ -43,14 +43,20 @@ func HandleFrontIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exprs, err := repository.GetAllExpressions()
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	exprs, err := repository.GetAllExpressions(userID)
 	if err != nil {
 		http.Error(w, "failed to get expressions", http.StatusInternalServerError)
 		return
 	}
 
 	data := struct {
-		Expressions interface{}
+		Expressions []*model.Expression
 	}{
 		Expressions: exprs,
 	}
@@ -68,6 +74,12 @@ func HandleFrontAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	expr := r.FormValue("expression")
 	if expr == "" {
 		http.Error(w, "empty expression", http.StatusBadRequest)
@@ -79,7 +91,7 @@ func HandleFrontAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newExpr, err := repository.CreateExpression(expr)
+	newExpr, err := repository.CreateExpression(expr, userID)
 	if err != nil {
 		http.Error(w, "cannot create expression", http.StatusInternalServerError)
 		return
@@ -106,10 +118,15 @@ func HandleFrontExpression(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// URL: /expression/<id>
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	id := r.URL.Path[len("/expression/"):]
 
-	expr, err := repository.GetExpressionByID(id)
+	expr, err := repository.GetExpressionByID(userID, id)
 	if err != nil {
 		http.Error(w, "repo error", http.StatusInternalServerError)
 		return
@@ -120,7 +137,7 @@ func HandleFrontExpression(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Expression interface{}
+		Expression *model.Expression
 	}{
 		Expression: expr,
 	}

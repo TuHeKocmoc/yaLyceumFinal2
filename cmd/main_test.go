@@ -3,24 +3,56 @@ package main_test
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/db"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/handler"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/model"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
 )
 
+func TestMain(m *testing.M) {
+	os.Setenv("DB_PATH", ":memory:")
+
+	if err := db.InitDB(); err != nil {
+		log.Fatal("failed to init db:", err)
+	}
+
+	code := m.Run()
+	os.Exit(code)
+}
+
+func clearDB() error {
+	_, err := db.GlobalDB.Exec("DELETE FROM tasks;")
+	if err != nil {
+		return err
+	}
+	_, err = db.GlobalDB.Exec("DELETE FROM expressions;")
+	return err
+}
+
 func TestIntegration_Orchestrator(t *testing.T) {
-	repository.Reset()
+	if err := clearDB(); err != nil {
+		t.Fatalf("clearDB error: %v", err)
+	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/calculate", handler.HandleCreateExpression)
-	mux.HandleFunc("/api/v1/expressions", handler.HandleGetAllExpressions)
-	mux.HandleFunc("/api/v1/expressions/", handler.HandleGetExpressionByID)
+
+	mux.HandleFunc("/api/v1/register", handler.HandleRegister)
+	mux.HandleFunc("/api/v1/login", handler.HandleLogin)
+
+	mux.Handle("/api/v1/calculate",
+		handler.AuthMiddleware(http.HandlerFunc(handler.HandleCreateExpression)))
+	mux.Handle("/api/v1/expressions",
+		handler.AuthMiddleware(http.HandlerFunc(handler.HandleGetAllExpressions)))
+	mux.Handle("/api/v1/expressions/",
+		handler.AuthMiddleware(http.HandlerFunc(handler.HandleGetExpressionByID)))
 
 	mux.HandleFunc("/internal/task", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -35,14 +67,47 @@ func TestIntegration_Orchestrator(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
+	registerBody := `{"login":"testuser","password":"123"}`
+	regResp, err := http.Post(server.URL+"/api/v1/register", "application/json", strings.NewReader(registerBody))
+	if err != nil {
+		t.Fatalf("register error: %v", err)
+	}
+	if regResp.StatusCode != http.StatusOK {
+		t.Fatalf("register got status %d, want 200", regResp.StatusCode)
+	}
+	_ = regResp.Body.Close()
+
+	loginBody := `{"login":"testuser","password":"123"}`
+	loginResp, err := http.Post(server.URL+"/api/v1/login", "application/json", strings.NewReader(loginBody))
+	if err != nil {
+		t.Fatalf("login error: %v", err)
+	}
+	if loginResp.StatusCode != http.StatusOK {
+		t.Fatalf("login got status %d, want 200", loginResp.StatusCode)
+	}
+	var tokenData struct {
+		Token string `json:"token"`
+	}
+	_ = json.NewDecoder(loginResp.Body).Decode(&tokenData)
+	_ = loginResp.Body.Close()
+	if tokenData.Token == "" {
+		t.Fatalf("empty token after login")
+	}
+	t.Logf("Got token: %s", tokenData.Token)
+
 	calcBody := `{"expression":"2+2*2"}`
-	resp, err := http.Post(server.URL+"/api/v1/calculate", "application/json", strings.NewReader(calcBody))
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/api/v1/calculate", strings.NewReader(calcBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+tokenData.Token)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("POST /api/v1/calculate error: %v", err)
 	}
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("unexpected status: got %d, want 201", resp.StatusCode)
 	}
+
 	var created struct {
 		ID string `json:"id"`
 	}
@@ -54,9 +119,8 @@ func TestIntegration_Orchestrator(t *testing.T) {
 	t.Logf("Created expression with ID=%s", created.ID)
 
 	for i := 0; i < 5; i++ {
-		time.Sleep(100 * time.Millisecond) // Подождём чуть
+		time.Sleep(100 * time.Millisecond)
 
-		// GET /internal/task
 		getResp, err := http.Get(server.URL + "/internal/task")
 		if err != nil {
 			t.Fatalf("GET /internal/task error: %v", err)
@@ -104,7 +168,6 @@ func TestIntegration_Orchestrator(t *testing.T) {
 			resVal = 0
 		}
 
-		// POST /internal/task
 		bodyReq, _ := json.Marshal(map[string]interface{}{
 			"id":     taskResp.Task.ID,
 			"result": resVal,
@@ -120,9 +183,9 @@ func TestIntegration_Orchestrator(t *testing.T) {
 		t.Logf("[AGENT] posted result=%.2f for taskID=%d", resVal, taskResp.Task.ID)
 	}
 
-	expr, err := repository.GetExpressionByID(created.ID)
+	expr, err := repository.GetExpressionByIDNoUserCheck(created.ID)
 	if err != nil {
-		t.Fatalf("GetExpressionByID error: %v", err)
+		t.Fatalf("GetExpressionByIDNoUserCheck error: %v", err)
 	}
 	if expr == nil {
 		t.Fatal("expression not found in repository")

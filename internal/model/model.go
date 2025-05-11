@@ -1,6 +1,5 @@
 package model
 
-// "Expression"
 const (
 	StatusPending    = "PENDING"
 	StatusInProgress = "IN_PROGRESS"
@@ -8,7 +7,6 @@ const (
 	StatusError      = "ERROR"
 )
 
-// "Task"
 const (
 	TaskStatusWaiting    = "WAITING"
 	TaskStatusInProgress = "IN_PROGRESS"
@@ -23,6 +21,7 @@ type Expression struct {
 	Result      *float64 `json:"result"`
 	Tasks       []int    `json:"tasks"`
 	FinalTaskID int      `json:"final_task_id,omitempty"`
+	UserID      int64    `json:"user_id"`
 }
 
 type Task struct {

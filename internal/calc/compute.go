@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Этой функции на вход должно даться выражение типа [число] (оператор) [число],
-// она его посчитает и вернет float64
 func Compute(expression string) (float64, error) {
 	var firstnum []rune
 	var secondnum []rune
@@ -15,18 +13,13 @@ func Compute(expression string) (float64, error) {
 	firstNumEnded := false
 	operators := "+-*/"
 
-	// fmt.Println("got expression to compute: ", expression)
-
 	for i, char := range expression {
 		if strings.Contains(operators, string(char)) {
 			temp := operator
 			operator = string(char)
 			if (operator == "-" && i == 0) || firstNumEnded {
-				// fmt.Println("got in special case with i:", i, string(expression[i]))
-				// fmt.Println(operator == "-" && i == 0)
 				operator = temp
 			} else {
-				// fmt.Println("got op and firstnum: ", string(firstnum), operator)
 				firstNumEnded = true
 				continue
 			}
@@ -37,10 +30,6 @@ func Compute(expression string) (float64, error) {
 			secondnum = append(secondnum, char)
 		}
 	}
-
-	// fmt.Println("got first_num:", string(firstnum))
-	// fmt.Println("got second num:", string(secondnum))
-	// fmt.Println("got op:", operator)
 
 	if len(firstnum) == 0 || len(secondnum) == 0 || len(operator) == 0 {
 		return 0.0, errors.New("incorrect expression" + expression)

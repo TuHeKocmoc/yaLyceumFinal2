@@ -7,11 +7,8 @@ import (
 	"strings"
 )
 
-// Основная функция
 func Calc(expression string) (float64, error) {
 	expression = strings.ReplaceAll(expression, " ", "")
-
-	// fmt.Println("expression with deleted whitespaces: ", expression)
 
 	for strings.Contains(expression, "(") {
 		lp := strings.Index(expression, "(")
@@ -21,8 +18,6 @@ func Calc(expression string) (float64, error) {
 			return 0.0, err
 		}
 	}
-
-	// fmt.Println("got expression with removed parenthesis: ", expression)
 
 	for strings.Contains(expression, "/") || strings.Contains(expression, "*") {
 		index_mul := strings.Index(expression, "*")
@@ -37,31 +32,25 @@ func Calc(expression string) (float64, error) {
 			index_mul = math.MaxInt64
 		}
 
-		// fmt.Println("indexes:", index_mul, index_div)
-
 		if index_div < index_mul {
-			// fmt.Println("sent expression with div op at: ", expression, index_div)
+
 			left, right, err = FindBorders(expression, index_div)
 			if err != nil {
 				return 0.0, err
 			}
 		} else {
-			// fmt.Println("sent expression with mul op at: ", expression, index_div)
 			left, right, err = FindBorders(expression, index_mul)
 			if err != nil {
 				return 0.0, err
 			}
 		}
 
-		// fmt.Println("computation expression in borders ", expression[left:right])
 		result, err := Compute(expression[left:right])
 		if err != nil {
 			return 0.0, err
 		}
 
-		// fmt.Println("expression before computation: ", expression)
 		expression = expression[:left] + string(fmt.Sprintf("%f", result)) + expression[right:]
-		// fmt.Println("made new expression after computation: ", expression)
 
 	}
 
@@ -88,35 +77,25 @@ func Calc(expression string) (float64, error) {
 			index_sub = math.MaxInt64
 		}
 
-		// fmt.Println("indexes:", index_add, index_sub)
-
 		if index_sub < index_add || index_add == -1 {
-			// fmt.Println("sent expression with op sub at: ", expression, index_sub)
 			left, right, err = FindBorders(expression, index_sub)
 			if err != nil {
 				return 0.0, err
 			}
 		} else {
-			// fmt.Println("sent expression with op pl at: ", expression, index_add)
 			left, right, err = FindBorders(expression, index_add)
 			if err != nil {
 				return 0.0, err
 			}
 		}
-
-		// fmt.Println("computation expression in borders: ", expression[left:right])
 		result, err := Compute(expression[left:right])
 		if err != nil {
 			return 0.0, err
 		}
 
-		// fmt.Println("expression before computation: ", expression)
 		expression = expression[:left] + string(fmt.Sprintf("%f", result)) + expression[right:]
-		// fmt.Println("made new expression after computation: ", expression)
 
 	}
-
-	// fmt.Println("ready to answer: ", expression)
 
 	res, err := strconv.ParseFloat(expression, 64)
 	if err != nil {

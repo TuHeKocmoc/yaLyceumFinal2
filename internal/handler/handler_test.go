@@ -1,23 +1,60 @@
 package handler_test
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/db"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/handler"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
 )
 
-// Тестируем POST /api/v1/calculate
+const testUserID int64 = 999
+
+func TestMain(m *testing.M) {
+	os.Setenv("DB_PATH", ":memory:")
+
+	if err := db.InitDB(); err != nil {
+		log.Fatal("failed to init in-memory db:", err)
+	}
+
+	code := m.Run()
+	os.Exit(code)
+}
+
+func clearDB() error {
+	_, err := db.GlobalDB.Exec("DELETE FROM tasks;")
+	if err != nil {
+		return err
+	}
+	_, err = db.GlobalDB.Exec("DELETE FROM expressions;")
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func withTestUserID(r *http.Request, userID int64) *http.Request {
+	ctx := context.WithValue(r.Context(), handler.UserIDCtxKey, userID)
+	return r.WithContext(ctx)
+}
+
 func TestHandleCreateExpression(t *testing.T) {
-	repository.Reset() // очищаем карты
+	if err := clearDB(); err != nil {
+		t.Fatalf("clearDB error: %v", err)
+	}
 
 	body := `{"expression":"2+2*2"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+
+	req = withTestUserID(req, testUserID)
 
 	w := httptest.NewRecorder()
 
@@ -31,12 +68,17 @@ func TestHandleCreateExpression(t *testing.T) {
 	var out struct {
 		ID string `json:"id"`
 	}
-	_ = json.NewDecoder(resp.Body).Decode(&out)
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode response error: %v", err)
+	}
 	if out.ID == "" {
 		t.Error("expected non-empty ID in response")
 	}
 
-	expr, _ := repository.GetExpressionByID(out.ID)
+	expr, err := repository.GetExpressionByID(testUserID, out.ID)
+	if err != nil {
+		t.Fatalf("GetExpressionByID error: %v", err)
+	}
 	if expr == nil {
 		t.Fatalf("expression not found in repository after creation")
 	}
@@ -45,14 +87,17 @@ func TestHandleCreateExpression(t *testing.T) {
 	}
 }
 
-// Тестируем GET /api/v1/expressions
 func TestHandleGetAllExpressions(t *testing.T) {
-	repository.Reset()
+	if err := clearDB(); err != nil {
+		t.Fatalf("clearDB error: %v", err)
+	}
 
-	_, _ = repository.CreateExpression("111+222")
-	_, _ = repository.CreateExpression("333+444")
+	_, _ = repository.CreateExpression("111+222", testUserID)
+	_, _ = repository.CreateExpression("333+444", testUserID)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/expressions", nil)
+	req = withTestUserID(req, testUserID)
+
 	w := httptest.NewRecorder()
 
 	handler.HandleGetAllExpressions(w, req)
@@ -67,21 +112,25 @@ func TestHandleGetAllExpressions(t *testing.T) {
 			Result *float64 `json:"result"`
 		} `json:"expressions"`
 	}
-	_ = json.NewDecoder(w.Body).Decode(&out)
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
+		t.Fatalf("decode json error: %v", err)
+	}
 
 	if len(out.Expressions) != 2 {
 		t.Errorf("expected 2 expressions, got %d", len(out.Expressions))
 	}
-
 }
 
-// POST /front/add
 func TestHandleFrontAdd(t *testing.T) {
-	repository.Reset()
+	if err := clearDB(); err != nil {
+		t.Fatalf("clearDB error: %v", err)
+	}
 
 	form := "expression=2%2B2"
 	req := httptest.NewRequest(http.MethodPost, "/front/add", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	req = withTestUserID(req, testUserID)
 
 	w := httptest.NewRecorder()
 
@@ -91,7 +140,10 @@ func TestHandleFrontAdd(t *testing.T) {
 		t.Fatalf("expected 3xx redirect, got %d", status)
 	}
 
-	exprs, _ := repository.GetAllExpressions()
+	exprs, err := repository.GetAllExpressions(testUserID)
+	if err != nil {
+		t.Fatalf("GetAllExpressions error: %v", err)
+	}
 	if len(exprs) != 1 {
 		t.Fatalf("expected 1 expression, got %d", len(exprs))
 	}

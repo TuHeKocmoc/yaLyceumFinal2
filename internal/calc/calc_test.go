@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// Здесь тесты для всех функций, связанных с логикой: FindSecondOccurence, FindBorders, и т.д.
-
 func TestFindSecondOccurence(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -31,13 +29,13 @@ func TestFindSecondOccurence(t *testing.T) {
 			name:       "Two occurrences",
 			expression: "1+2+3",
 			char:       '+',
-			want:       3, // индекс второго '+'
+			want:       3,
 		},
 		{
 			name:       "More than two occurrences",
 			expression: "1-2-3-4",
 			char:       '-',
-			want:       3, // индекс второго '-'
+			want:       3,
 		},
 		{
 			name:       "Empty string",
@@ -81,7 +79,7 @@ func TestFindBorders(t *testing.T) {
 			index:      3,
 			wantLeft:   0,
 			wantRight:  4,
-			wantErr:    nil, // Странное выражение, но ошибка не возвращается
+			wantErr:    nil,
 		},
 		{
 			name:       "Negative number in expression",
@@ -295,13 +293,13 @@ func TestCalc(t *testing.T) {
 		},
 		{
 			name:       "Expression with parentheses",
-			expression: "(2+3)*4", // 5*4=20
+			expression: "(2+3)*4",
 			want:       20,
 			wantErr:    false,
 		},
 		{
 			name:       "Nested parentheses",
-			expression: "((1+2)*3)", // (3*3)=9
+			expression: "((1+2)*3)",
 			want:       9,
 			wantErr:    false,
 		},
@@ -313,13 +311,13 @@ func TestCalc(t *testing.T) {
 		},
 		{
 			name:       "Multiple operators in a row with negative number",
-			expression: "2--2", // 2-(-2)=4
+			expression: "2--2",
 			want:       4,
 			wantErr:    false,
 		},
 		{
 			name:       "Complex expression",
-			expression: "3+5*2-8/4", // 3+10-2=11
+			expression: "3+5*2-8/4",
 			want:       11,
 			wantErr:    false,
 		},
@@ -346,12 +344,10 @@ func TestCalc(t *testing.T) {
 	}
 }
 
-// Утилита для проверки подстроки
 func stringsContains(haystack, needle string) bool {
 	return bytes.Contains([]byte(haystack), []byte(needle))
 }
 
-// Сравнение float с учётом погрешности
 func floatEquals(a, b float64) bool {
 	eps := 1e-9
 	return (a-b) < eps && (b-a) < eps

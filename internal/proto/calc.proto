@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package calc;
+
+
+option go_package = "github.com/TuHeKocmoc/yalyceumfinal2/internal/proto/calc;calc";
+
+service CalcService {
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+
+  rpc PostResult(PostResultRequest) returns (PostResultResponse);
+}
+
+
+message GetTaskRequest {}
+
+// Ответ
+message GetTaskResponse {
+  string status = 1;
+
+  TaskData task = 2;
+}
+
+// TaskData описывает задачу
+message TaskData {
+  int32 id = 1;
+  double arg1 = 2;
+  double arg2 = 3;
+  string operation = 4;     
+  int32 operation_time = 5; 
+}
+
+
+message PostResultRequest {
+  int32 id = 1;      
+  double result = 2; 
+}
+
+message PostResultResponse {
+  string status = 1;
+}

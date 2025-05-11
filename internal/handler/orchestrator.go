@@ -3,12 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc" // если хотим переиспользовать CheckInput
+	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/model"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/planner"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/repository"
@@ -42,11 +43,10 @@ func getEnvAsInt(name string, defaultVal int) int {
 	return parsed
 }
 
-// 1) POST /api/v1/calculate
-// { "expression": "2+2*2" }
 type requestExpression struct {
 	Expression string `json:"expression"`
 }
+
 type responseCreateExpression struct {
 	ID string `json:"id"`
 }
@@ -57,18 +57,26 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req requestExpression
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("[DEBUG] expression = %q", req.Expression)
+
 	if !calc.CheckInput(req.Expression) {
 		http.Error(w, "expression is not valid", http.StatusUnprocessableEntity)
 		return
 	}
 
-	expr, err := repository.CreateExpression(req.Expression)
+	expr, err := repository.CreateExpression(req.Expression, userID)
 	if err != nil {
 		http.Error(w, "cannot create expression", http.StatusInternalServerError)
 		return
@@ -80,13 +88,13 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 			expr.Status = model.StatusError
 			_ = repository.UpdateExpression(expr)
 			http.Error(w, "cannot plan tasks: "+err.Error(), http.StatusUnprocessableEntity)
+			log.Printf("[DEBUG] PlanTasksWithNestedParen error: %v", err)
 			return
 		}
+
 		expr.Status = model.StatusInProgress
-		_ = repository.UpdateExpression(expr)
-
 		expr.FinalTaskID = finalTaskID
-
+		_ = repository.UpdateExpression(expr)
 	}
 
 	resp := responseCreateExpression{ID: expr.ID}
@@ -94,7 +102,6 @@ func HandleCreateExpression(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// 2) GET /api/v1/expressions
 type responseExpressionsList struct {
 	Expressions []*model.Expression `json:"expressions"`
 }
@@ -105,9 +112,16 @@ func HandleGetAllExpressions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exprs, err := repository.GetAllExpressions()
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	exprs, err := repository.GetAllExpressions(userID)
 	if err != nil {
 		http.Error(w, "failed to get expressions", http.StatusInternalServerError)
+		log.Printf("[DEBUG] GetAllExpressions error: %v", err)
 		return
 	}
 
@@ -116,7 +130,6 @@ func HandleGetAllExpressions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// 3) GET /api/v1/expressions/:id
 type responseSingleExpression struct {
 	Expression *model.Expression `json:"expression"`
 }
@@ -127,7 +140,12 @@ func HandleGetExpressionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// URL e.g. api/v1/expressions/123e4567-e89b-12d3-a456-426614174000
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
 		http.Error(w, "invalid url", http.StatusBadRequest)
@@ -135,7 +153,7 @@ func HandleGetExpressionByID(w http.ResponseWriter, r *http.Request) {
 	}
 	id := parts[3]
 
-	expr, err := repository.GetExpressionByID(id)
+	expr, err := repository.GetExpressionByID(userID, id)
 	if err != nil {
 		http.Error(w, "error in repository", http.StatusInternalServerError)
 		return
@@ -156,7 +174,7 @@ type responseTask struct {
 		Arg1          interface{} `json:"arg1"`
 		Arg2          interface{} `json:"arg2"`
 		Operation     string      `json:"operation"`
-		OperationTime int         `json:"operation_time"` // из переменных окружения
+		OperationTime int         `json:"operation_time"`
 	} `json:"task"`
 }
 
@@ -184,11 +202,9 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 
 	operationTime := getOperationTime(task.Op)
 
-	var arg1 interface{}
-	var arg2 interface{}
-
+	var arg1, arg2 interface{}
 	if task.Op == "FULL" {
-		expr, err := repository.GetExpressionByID(task.ExpressionID)
+		expr, err := repository.GetExpressionByIDForTask(task.ExpressionID)
 		if err != nil {
 			http.Error(w, "failed to get expression", http.StatusInternalServerError)
 			return
@@ -200,34 +216,11 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 		arg1 = expr.Raw
 		arg2 = nil
 	} else {
-		if task.Arg1Value != nil {
-			arg1 = *task.Arg1Value
-		} else if task.Arg1TaskID != nil {
-			depTask, _ := repository.GetTaskByID(*task.Arg1TaskID)
-			if depTask != nil && depTask.Result != nil {
-				arg1 = *depTask.Result
-			} else {
-				arg1 = 0.0
-			}
-		} else {
-			arg1 = 0.0
-		}
-
-		if task.Arg2Value != nil {
-			arg2 = *task.Arg2Value
-		} else if task.Arg2TaskID != nil {
-			depTask, _ := repository.GetTaskByID(*task.Arg2TaskID)
-			if depTask != nil && depTask.Result != nil {
-				arg2 = *depTask.Result
-			} else {
-				arg2 = 0.0
-			}
-		} else {
-			arg2 = 0.0
-		}
+		arg1 = fetchArgumentValue(task.Arg1Value, task.Arg1TaskID)
+		arg2 = fetchArgumentValue(task.Arg2Value, task.Arg2TaskID)
 	}
 
-	resp := responseTask{}
+	var resp responseTask
 	resp.Task.ID = task.ID
 	resp.Task.Arg1 = arg1
 	resp.Task.Arg2 = arg2
@@ -238,8 +231,19 @@ func HandleGetTask(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// 5) POST /internal/task
-// { "id": 101, "result": 6.0 }
+func fetchArgumentValue(argValue *float64, argTaskID *int) interface{} {
+	if argValue != nil {
+		return *argValue
+	}
+	if argTaskID != nil {
+		depTask, _ := repository.GetTaskByID(*argTaskID)
+		if depTask != nil && depTask.Result != nil {
+			return *depTask.Result
+		}
+	}
+	return 0.0
+}
+
 type rawTaskResult struct {
 	ID     json.Number `json:"id"`
 	Result json.Number `json:"result"`
@@ -267,10 +271,9 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "result must be a float", http.StatusUnprocessableEntity)
 		return
 	}
+	taskID := int(idInt64)
 
-	id := int(idInt64)
-
-	task, err := repository.GetTaskByID(id)
+	task, err := repository.GetTaskByID(taskID)
 	if err != nil {
 		http.Error(w, "error in repository", http.StatusInternalServerError)
 		return
@@ -286,13 +289,12 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 
 	task.Status = model.TaskStatusDone
 	task.Result = &resultFloat64
-
 	if err := repository.UpdateTask(task); err != nil {
 		http.Error(w, "failed to update task", http.StatusInternalServerError)
 		return
 	}
 
-	expr, err := repository.GetExpressionByID(task.ExpressionID)
+	expr, err := repository.GetExpressionByIDForTask(task.ExpressionID)
 	if err != nil || expr == nil {
 		http.Error(w, "expression not found", http.StatusInternalServerError)
 		return
@@ -302,18 +304,14 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 		expr.Result = &resultFloat64
 		expr.Status = model.StatusDone
 		_ = repository.UpdateExpression(expr)
-
 	} else {
-		if allTasksDone(expr) {
-			lastTaskID := expr.Tasks[len(expr.Tasks)-1]
-			finalTask, err := repository.GetTaskByID(lastTaskID)
-			if err != nil {
-				http.Error(w, "error fetching final task", http.StatusInternalServerError)
-				return
-			}
-			if finalTask != nil && finalTask.Result != nil {
-				expr.Result = finalTask.Result
-			}
+		done, lastTaskResult, err := checkAllTasksDone(expr.ID)
+		if err != nil {
+			http.Error(w, "cannot check tasks", http.StatusInternalServerError)
+			return
+		}
+		if done {
+			expr.Result = lastTaskResult
 			expr.Status = model.StatusDone
 			if err := repository.UpdateExpression(expr); err != nil {
 				http.Error(w, "failed to update expression", http.StatusInternalServerError)
@@ -326,16 +324,29 @@ func HandlePostTaskResult(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `{"status":"ok"}`)
 }
 
-func allTasksDone(expr *model.Expression) bool {
-	for _, taskID := range expr.Tasks {
-		t, ok := repository.GetTaskByID(taskID)
-		if ok == nil && t != nil {
-			if t.Status != model.TaskStatusDone {
-				return false
-			}
+func checkAllTasksDone(exprID string) (bool, *float64, error) {
+	tasks, err := repository.GetTasksByExpressionID(exprID)
+	if err != nil {
+		return false, nil, err
+	}
+	if len(tasks) == 0 {
+		return true, nil, nil
+	}
+
+	allDone := true
+	var lastResult *float64
+	var lastTaskID int
+
+	for _, t := range tasks {
+		if t.Status != model.TaskStatusDone {
+			allDone = false
+		}
+		if t.ID > lastTaskID && t.Result != nil {
+			lastTaskID = t.ID
+			lastResult = t.Result
 		}
 	}
-	return true
+	return allDone, lastResult, nil
 }
 
 func getOperationTime(op string) int {

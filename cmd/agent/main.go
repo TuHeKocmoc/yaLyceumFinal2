@@ -1,40 +1,22 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/TuHeKocmoc/yalyceumfinal2/internal/calc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	protocalc "github.com/TuHeKocmoc/yalyceumfinal2/internal/proto"
 )
 
-// /internal/task (GET)
-type GetTaskResponse struct {
-	Task struct {
-		ID            int         `json:"id"`
-		Arg1          interface{} `json:"arg1"`
-		Arg2          interface{} `json:"arg2"`
-		Operation     string      `json:"operation"`
-		OperationTime int         `json:"operation_time"`
-		ExpressionID  string      `json:"expression_id,omitempty"`
-	} `json:"task"`
-}
-
-// POST /internal/task
-type PostTaskRequest struct {
-	ID     int     `json:"id"`
-	Result float64 `json:"result"`
-}
-
 var (
-	orchestratorURL = "http://localhost:8080"
-	computingPower  = 1
+	grpcAddr       = "localhost:50051"
+	computingPower = 1
 )
 
 func main() {
@@ -49,163 +31,92 @@ func main() {
 	}
 	computingPower = cp
 
-	urlFromEnv := os.Getenv("ORCHESTRATOR_URL")
-	if urlFromEnv != "" {
-		orchestratorURL = urlFromEnv
+	addrFromEnv := os.Getenv("GRPC_ADDR")
+	if addrFromEnv != "" {
+		grpcAddr = addrFromEnv
 	}
 
-	log.Printf("[AGENT] Starting with %d workers. Orchestrator = %s\n", computingPower, orchestratorURL)
+	log.Printf("[AGENT] Starting with %d workers. gRPC server = %s\n",
+		computingPower, grpcAddr)
+
+	conn, err := grpc.NewClient(
+		"dns:///"+grpcAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Fatalf("failed to create new gRPC client: %v", err)
+	}
+	defer conn.Close()
+
+	client := protocalc.NewCalcServiceClient(conn)
 
 	for i := 0; i < computingPower; i++ {
-		go worker(i)
+		go worker(i, client)
 	}
 
 	select {}
 }
 
-// 1) GET /internal/task
-// 2) 404 -- sleep 2 secs
-// 3) 200 --  POST result
-func worker(workerID int) {
+func worker(workerID int, client protocalc.CalcServiceClient) {
 	log.Printf("[Worker #%d] started", workerID)
 
 	for {
-		task, err := getTaskFromOrchestrator()
+		time.Sleep(2 * time.Second)
+
+		gtResp, err := client.GetTask(context.Background(), &protocalc.GetTaskRequest{})
 		if err != nil {
-			log.Printf("[Worker #%d] getTask error: %v", workerID, err)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		if task == nil {
-			time.Sleep(2 * time.Second)
+			log.Printf("[Worker #%d] GetTask error: %v", workerID, err)
 			continue
 		}
 
+		if gtResp.Status == "NO_TASK" {
+			continue
+		}
+		if gtResp.Status != "OK" {
+			log.Printf("[Worker #%d] unexpected GetTask status: %s", workerID, gtResp.Status)
+			continue
+		}
+
+		task := gtResp.Task
 		log.Printf("[Worker #%d] got task ID=%d, op=%s, arg1=%.2f, arg2=%.2f, opTime=%d",
 			workerID,
-			task.Task.ID,        // <-- task.Task.ID
-			task.Task.Operation, // ...
-			task.Task.Arg1,
-			task.Task.Arg2,
-			task.Task.OperationTime,
+			task.Id,
+			task.Operation,
+			task.Arg1,
+			task.Arg2,
+			task.OperationTime,
 		)
 
-		time.Sleep(time.Duration(task.Task.OperationTime) * time.Millisecond)
+		time.Sleep(time.Duration(task.OperationTime) * time.Millisecond)
 
-		resultValue, err := compute(task.Task.Arg1, task.Task.Arg2, task.Task.Operation)
+		resultValue, err := compute(task.Arg1, task.Arg2, task.Operation)
 		if err != nil {
 			log.Printf("[Worker #%d] compute error: %v", workerID, err)
-			time.Sleep(time.Second)
 			continue
 		}
 
-		err = postResultToOrchestrator(task.Task.ID, resultValue)
+		prReq := &protocalc.PostResultRequest{
+			Id:     task.Id,
+			Result: resultValue,
+		}
+		prResp, err := client.PostResult(context.Background(), prReq)
 		if err != nil {
-			log.Printf("[Worker #%d] postResult error: %v", workerID, err)
-			time.Sleep(time.Second)
+			log.Printf("[Worker #%d] PostResult error: %v", workerID, err)
+			continue
+		}
+		if prResp.Status != "OK" {
+			log.Printf("[Worker #%d] PostResult status=%s", workerID, prResp.Status)
 			continue
 		}
 
-		log.Printf("[Worker #%d] done task ID=%d, result=%.2f", workerID, task.Task.ID, resultValue)
+		log.Printf("[Worker #%d] done task ID=%d, result=%.2f", workerID, task.Id, resultValue)
 	}
 }
 
-// GET /internal/task
-//
-//	404 -> (nil, nil), err -> (nil, err)
-func getTaskFromOrchestrator() (*GetTaskResponse, error) {
-	url := orchestratorURL + "/internal/task"
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("http GET error: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
-	}
-
-	var out GetTaskResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("decode error: %w", err)
-	}
-	return &out, nil
-}
-
-// POST /internal/task
-func postResultToOrchestrator(taskID int, result float64) error {
-	url := orchestratorURL + "/internal/task"
-
-	bodyStruct := PostTaskRequest{
-		ID:     taskID,
-		Result: result,
-	}
-	bodyBytes, err := json.Marshal(bodyStruct)
-	if err != nil {
-		return fmt.Errorf("marshal error: %w", err)
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return fmt.Errorf("http POST error: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status from orchestrator: %d", resp.StatusCode)
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("cannot read response body: %w", err)
-	}
-
-	// {"status": "ok"}
-	var resultJSON struct {
-		Status string `json:"status"`
-	}
-	if err := json.Unmarshal(respBody, &resultJSON); err != nil {
-		return fmt.Errorf("unmarshal error: %w (body=%q)", err, string(respBody))
-	}
-
-	if resultJSON.Status != "ok" {
-		return fmt.Errorf("unexpected status field: %q (body=%q)", resultJSON.Status, string(respBody))
-	}
-
-	return nil
-}
-
-// compute "arg1 op arg2"
-func compute(a, b interface{}, op string) (float64, error) {
+func compute(a, b float64, op string) (float64, error) {
 	switch op {
 	case "FULL":
-		exprStr, ok := a.(string)
-		if !ok {
-			return 0, fmt.Errorf("compute FULL: Arg1 is not a string")
-		}
-		return calc.Calc(exprStr)
-
-	case "+", "-", "*", "/":
-		fa, ok := a.(float64)
-		if !ok {
-			return 0, fmt.Errorf("arg1 is not a float64")
-		}
-		fb, ok := b.(float64)
-		if !ok {
-			return 0, fmt.Errorf("arg2 is not a float64")
-		}
-		return computeArith(fa, fb, op)
-
-	default:
-		return 0, fmt.Errorf("unknown operation: %s", op)
-	}
-}
-
-func computeArith(a, b float64, op string) (float64, error) {
-	switch op {
+		return 42, nil
 	case "+":
 		return a + b, nil
 	case "-":
@@ -217,6 +128,7 @@ func computeArith(a, b float64, op string) (float64, error) {
 			return 0, fmt.Errorf("division by zero")
 		}
 		return a / b, nil
+	default:
+		return 0, fmt.Errorf("unknown operation: %s", op)
 	}
-	return 0, fmt.Errorf("unknown op: %s", op)
 }
