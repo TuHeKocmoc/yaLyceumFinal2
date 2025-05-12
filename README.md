@@ -6,8 +6,10 @@
 - **Агент (клиент)**, который забирает у оркестратора задачи и выполняет их (имитируя длительные вычисления).
 
 ## :rocket: Основной функционал
-
-1. **POST /api/v1/calculate** – добавление нового арифметического выражения  
+1. **Регистрация и логин (JWT)**:
+  - POST /api/v1/register {"login","password"} → 200 OK или 409 Conflict.
+  - POST /api/v1/login {"login","password"} → {"token":"<jwt>"} или 401 Unauthorized.
+2. **POST /api/v1/calculate** – добавление нового арифметического выражения  
    - Тело запроса:
      ```json
      {
@@ -64,19 +66,21 @@
 
 ## :globe_with_meridians: Простой веб-интерфейс (фронтенд)
 
-В проекте есть фронтенд-часть (можете воспользоваться https://hseastro.space), которая позволяет:
+В проекте есть фронтенд-часть, которая позволяет:
 - Посмотреть список добавленных выражений (их статусы и результаты).
 - Ввести новое выражение в простую форму.
 - Нужно обновлять страницу для изменений.
 
 ## :gear: Переменные окружения
-
+- **DB_PATH** – путь к SQLite базе. По умолчанию ":memory:" (в памяти). Можно указать "storage.db" для реального файла.
+- **JWT_SECRET** – секрет для подписи JWT-токенов (по умолчанию "MY_SUPER_SECRET").
 - **TIME_ADDITION_MS** – время выполнения операции сложения (миллисекунды)
 - **TIME_SUBTRACTION_MS** – время выполнения вычитания
 - **TIME_MULTIPLICATIONS_MS** – время умножения
 - **TIME_DIVISIONS_MS** – время деления
 - **TIME_FULL_MS** – время вычисления «полного» выражения (при опции `operation=FULL`)
 - **COMPUTING_POWER** – количество горутин у агента (для параллельных вычислений)
+- **GRPC_ADDR** – если используете gRPC (адрес для сервера, напр. ":50051").
 
 ## :wrench: Как запустить оркестратор
 
@@ -95,6 +99,8 @@
    ```
 5. Запустите оркестратор (сервер), выполнив:
   ```bash
+  DB_PATH=storage.db \
+  JWT_SECRET=mysecret \
   go run ./cmd/main.go
   ```
   По умолчанию он слушает порт 8080.
@@ -107,7 +113,8 @@
   ```
 2. Запустите:
   ```bash
-  COMPUTING_POWER=2 go run ./cmd/agent/main.go
+  COMPUTING_POWER=2 GRPC_ADDR=localhost:50051 \
+  go run ./cmd/agent/main.go
   ```
 
 ## :file_folder: Структура проекта
@@ -115,21 +122,29 @@
 ```
 yaLyceumFinal2/
 ├── cmd/
-│   ├── main.go            # Точка входа для "оркестратора" (основной сервер)
+│   ├── main.go         # Точка входа для оркестратора (HTTP + SQLite + gRPC)
 │   └── agent/
-│       └── main.go        # Точка входа для "агента" (который берёт задачи и считает)
+│       └── main.go     # Точка входа для агента (получение задач, вычисление)
 ├── internal/
-│   ├── model/             # Определения структур (Expression, Task, статусы)
-│   ├── repository/        # In-memory репозиторий (хранение Expression/Task)
-│   ├── handler/           # HTTP-хендлеры (оркестратор и front-end)
-│   ├── calc/              # Старый модуль вычислений (Calc, Compute, ...)
-│   └── planner/           # Планировщик (разбивка выражений на задачи)
+│   ├── model/          # Структуры (Expression, Task, статусы)
+│   ├── repository/     # SQLite-репозиторий (CreateExpression, CreateTaskWithArgs, ...)
+│   ├── handler/        # HTTP-хендлеры (регистрация/логин, /api/v1/calculate)
+│   ├── calc/           # Модуль вычислений (Calc, CheckInput)
+│   └── planner/        # Планировщик (PlanTasksWithNestedParen)
+├── proto/              # Если есть .proto для gRPC (calc.proto, ...)
 ├── web/
-│   ├── index.html         # Шаблон главной страницы (front-end)
-│   ├── expression.html    # Шаблон отдельной страницы (если нужно)
+│   ├── index.html      # Шаблон главной страницы (фронтенд)
+│   ├── expression.html # Шаблон отдельной страницы
 │   └── static/
-│       └── style.css      # CSS-стили live-обновление статусов
-├── EXAMPLE.md             # Примеры использования API (curl-запросы и т.д.)
-├── README.md              # Текущее описание проекта
-└── go.mod                 # Файл модуля Go
+│       └── style.css   # CSS-стили
+├── EXAMPLE.md          # Примеры использования API (curl)
+├── README.md           # Описание проекта (данный файл)
+└── go.mod              # Модуль Go
 ```
+
+## :white_check_mark: Тесты
+
+**Запустить тесты**:
+  ```bash
+  go test ./... -v
+  ```

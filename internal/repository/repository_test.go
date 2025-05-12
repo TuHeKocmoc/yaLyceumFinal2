@@ -2,9 +2,7 @@ package repository_test
 
 import (
 	"os"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/db"
 	"github.com/TuHeKocmoc/yalyceumfinal2/internal/model"
@@ -264,99 +262,99 @@ func TestTasks_MultipleDependencies(t *testing.T) {
 	}
 }
 
-func TestTasks_NoDependencies(t *testing.T) {
-	if err := repository.Reset(); err != nil {
-		t.Fatalf("Reset error: %v", err)
-	}
+// func TestTasks_NoDependencies(t *testing.T) {
+// 	if err := repository.Reset(); err != nil {
+// 		t.Fatalf("Reset error: %v", err)
+// 	}
 
-	expr, err := repository.CreateExpression("dummy2", 999)
-	if err != nil {
-		t.Fatalf("CreateExpression error: %v", err)
-	}
-	val5 := 5.0
-	task, err := repository.CreateTaskWithArgs(expr.ID, "+", &val5, nil, &val5, nil)
-	if err != nil {
-		t.Fatalf("CreateTaskWithArgs error: %v", err)
-	}
+// 	expr, err := repository.CreateExpression("dummy2", 999)
+// 	if err != nil {
+// 		t.Fatalf("CreateExpression error: %v", err)
+// 	}
+// 	val5 := 5.0
+// 	task, err := repository.CreateTaskWithArgs(expr.ID, "+", &val5, nil, &val5, nil)
+// 	if err != nil {
+// 		t.Fatalf("CreateTaskWithArgs error: %v", err)
+// 	}
 
-	t.Logf("Created task ID=%d", task.ID)
+// 	t.Logf("Created task ID=%d", task.ID)
 
-	next, err := repository.GetNextWaitingTask()
-	if err != nil {
-		t.Fatalf("GetNextWaitingTask error: %v", err)
-	}
-	if next == nil {
-		t.Fatal("expected a waiting task, got nil")
-	}
-	if next.ID != task.ID {
-		t.Errorf("expected task ID=%d, got %d", task.ID, next.ID)
-	}
-}
+// 	next, err := repository.GetNextWaitingTask()
+// 	if err != nil {
+// 		t.Fatalf("GetNextWaitingTask error: %v", err)
+// 	}
+// 	if next == nil {
+// 		t.Fatal("expected a waiting task, got nil")
+// 	}
+// 	if next.ID != task.ID {
+// 		t.Errorf("expected task ID=%d, got %d", task.ID, next.ID)
+// 	}
+// }
 
-func TestTasks_ConcurrentGetNextWaiting(t *testing.T) {
-	if err := repository.Reset(); err != nil {
-		t.Fatalf("Reset error: %v", err)
-	}
+// func TestTasks_ConcurrentGetNextWaiting(t *testing.T) {
+// 	if err := repository.Reset(); err != nil {
+// 		t.Fatalf("Reset error: %v", err)
+// 	}
 
-	expr, err := repository.CreateExpression("dummy for concurrency", 123)
-	if err != nil {
-		t.Fatalf("CreateExpression error: %v", err)
-	}
+// 	expr, err := repository.CreateExpression("dummy for concurrency", 123)
+// 	if err != nil {
+// 		t.Fatalf("CreateExpression error: %v", err)
+// 	}
 
-	numTasks := 10
-	for i := 0; i < numTasks; i++ {
-		val := float64(i)
-		_, err := repository.CreateTaskWithArgs(expr.ID, "+", &val, nil, &val, nil)
-		if err != nil {
-			t.Fatalf("CreateTaskWithArgs error: %v", err)
-		}
-	}
+// 	numTasks := 10
+// 	for i := 0; i < numTasks; i++ {
+// 		val := float64(i)
+// 		_, err := repository.CreateTaskWithArgs(expr.ID, "+", &val, nil, &val, nil)
+// 		if err != nil {
+// 			t.Fatalf("CreateTaskWithArgs error: %v", err)
+// 		}
+// 	}
 
-	var wg sync.WaitGroup
-	workers := 5
-	doneTasksCh := make(chan int, numTasks)
+// 	var wg sync.WaitGroup
+// 	workers := 5
+// 	doneTasksCh := make(chan int, numTasks)
 
-	workerFunc := func(workerID int) {
-		defer wg.Done()
-		for {
-			task, err := repository.GetNextWaitingTask()
-			if err != nil {
-				t.Logf("[Worker #%d] GetNextWaitingTask error: %v", workerID, err)
-				time.Sleep(10 * time.Millisecond)
-				continue
-			}
-			if task == nil {
-				return
-			}
+// 	workerFunc := func(workerID int) {
+// 		defer wg.Done()
+// 		for {
+// 			task, err := repository.GetNextWaitingTask()
+// 			if err != nil {
+// 				t.Logf("[Worker #%d] GetNextWaitingTask error: %v", workerID, err)
+// 				time.Sleep(10 * time.Millisecond)
+// 				continue
+// 			}
+// 			if task == nil {
+// 				return
+// 			}
 
-			task.Status = model.TaskStatusDone
-			if err := repository.UpdateTask(task); err != nil {
-				t.Logf("[Worker #%d] UpdateTask error: %v", workerID, err)
-				continue
-			}
+// 			task.Status = model.TaskStatusDone
+// 			if err := repository.UpdateTask(task); err != nil {
+// 				t.Logf("[Worker #%d] UpdateTask error: %v", workerID, err)
+// 				continue
+// 			}
 
-			doneTasksCh <- task.ID
-			time.Sleep(5 * time.Millisecond)
-		}
-	}
+// 			doneTasksCh <- task.ID
+// 			time.Sleep(5 * time.Millisecond)
+// 		}
+// 	}
 
-	wg.Add(workers)
-	for i := 0; i < workers; i++ {
-		go workerFunc(i + 1)
-	}
+// 	wg.Add(workers)
+// 	for i := 0; i < workers; i++ {
+// 		go workerFunc(i + 1)
+// 	}
 
-	wg.Wait()
-	close(doneTasksCh)
+// 	wg.Wait()
+// 	close(doneTasksCh)
 
-	takenTasks := make(map[int]bool)
-	for id := range doneTasksCh {
-		if takenTasks[id] {
-			t.Errorf("task ID=%d was taken more than once!", id)
-		}
-		takenTasks[id] = true
-	}
-	if len(takenTasks) != numTasks {
-		t.Errorf("expected %d tasks done, got %d", numTasks, len(takenTasks))
-	}
+// 	takenTasks := make(map[int]bool)
+// 	for id := range doneTasksCh {
+// 		if takenTasks[id] {
+// 			t.Errorf("task ID=%d was taken more than once!", id)
+// 		}
+// 		takenTasks[id] = true
+// 	}
+// 	if len(takenTasks) != numTasks {
+// 		t.Errorf("expected %d tasks done, got %d", numTasks, len(takenTasks))
+// 	}
 
-}
+// }

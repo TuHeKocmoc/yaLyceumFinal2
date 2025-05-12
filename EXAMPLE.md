@@ -4,15 +4,48 @@
 
 ---
 
+## :green_heart: 0. Регистрация и логин
+
+
+**0.1 Регистрация**:
+```bash
+curl --location 'http://localhost:8080/api/v1/register' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "login": "alice",
+    "password": "secret123"
+  }'
+```
+**Ожидаемый ответ (код 200 OK)**:
+```json
+{"status":"ok"}
+```
+**0.2 Логин**:
+```bash
+curl --location 'http://localhost:8080/api/v1/login' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "login": "alice",
+    "password": "secret123"
+  }'
+```
+**Ожидаемый ответ (код 200 OK)**:
+```json
+{
+  "token": "<jwt_token_string>"
+}
+```
+
 ## :heavy_check_mark: 1. Успешное добавление выражения
 
 **Запрос**:  
 ```bash
 curl --location 'http://localhost:8080/api/v1/calculate' \
---header 'Content-Type: application/json' \
---data '{
-  "expression": "2+2*2"
-}'
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data '{
+    "expression": "2+2*2"
+  }'
 ```
 **Ожидаемый ответ (код 201 Created)**:
 ```json
@@ -28,7 +61,8 @@ curl --location 'http://localhost:8080/api/v1/calculate' \
 
 **Получение списка выражений**:
 ```bash
-curl -X GET 'http://localhost:8080/api/v1/expressions'
+curl -X GET 'http://localhost:8080/api/v1/expressions' \
+  --header "Authorization: Bearer $TOKEN"
 ```
 
 **Пример ответа (код 200 OK)**:
@@ -47,7 +81,8 @@ json
 Пока агент не вычислил значение, `status` может быть `IN_PROGRESS`, а `result` — `null`.
 **Получение одного выражения по ID**:
 ```bash
-curl -X GET 'http://localhost:8080/api/v1/expressions/e4a95b12-8c2f-49d5-8914-8eac522c8512'
+curl -X GET "http://localhost:8080/api/v1/expressions/e4a95b12-8c2f-49d5-8914-8eac522c8512" \
+  --header "Authorization: Bearer $TOKEN"
 ```
 Если агент уже выполнил задачу, ответ будет:
 ```json
@@ -67,9 +102,11 @@ curl -X GET 'http://localhost:8080/api/v1/expressions/e4a95b12-8c2f-49d5-8914-8e
 **Запрос**:
 ```bash
 curl --location 'http://localhost:8080/api/v1/calculate' \
---header 'Content-Type: application/json' \
---data '{
-  "expression": "2+a"
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer $TOKEN" \
+  --data '{
+    "expression": "2+a"
+  }'
 }'
 ```
 
@@ -87,7 +124,8 @@ curl --location 'http://localhost:8080/api/v1/calculate' \
 Например, если `calc.Calc("10/0")` выбрасывает ошибку `«division by zero»`, агент передаст обратно ошибку (если такая логика реализована). В итоге оркестратор может ответить:
 
 ```bash
-curl --location 'http://localhost:8080/api/v1/expressions/<id>'
+curl --location "http://localhost:8080/api/v1/expressions/<id>" \
+  --header "Authorization: Bearer $TOKEN"
 ```
 
 ```json
