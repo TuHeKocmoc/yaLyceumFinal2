@@ -17,6 +17,30 @@ func removeSpaces(s string) string {
 }
 
 func CheckInput(s string) bool {
-	re := regexp.MustCompile(`^[0-9+\-/*().]+$`)
-	return re.MatchString(removeSpaces(s))
+	s = removeSpaces(s)
+	if s == "" {
+		return false
+	}
+
+	re := regexp.MustCompile(`^[0-9+\-*/().]+$`)
+	if !re.MatchString(s) {
+		return false
+	}
+
+	var stack int
+	for _, r := range s {
+		if r == '(' {
+			stack++
+		} else if r == ')' {
+			stack--
+			if stack < 0 {
+				return false
+			}
+		}
+	}
+	if stack != 0 {
+		return false
+	}
+	last := s[len(s)-1]
+	return !strings.ContainsRune("+-*/", rune(last))
 }

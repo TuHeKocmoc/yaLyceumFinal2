@@ -78,3 +78,71 @@ func TestPlanner_InvalidExpression(t *testing.T) {
 		t.Fatal("expected error for incomplete expression, got nil")
 	}
 }
+
+func TestPlanTasks_Simple(t *testing.T) {
+	repository.Reset()
+
+	expr, err := repository.CreateExpression("2+2*2", testUserID)
+	if err != nil {
+		t.Fatalf("CreateExpression error: %v", err)
+	}
+	if expr.ID == "" {
+		t.Fatal("expr.ID is empty")
+	}
+
+	finalID, err := planner.PlanTasksWithNestedParen(expr.ID, expr.Raw)
+	if err != nil {
+		t.Fatalf("PlanTasksWithNestedParen error: %v", err)
+	}
+	if finalID <= 0 {
+		t.Errorf("invalid final task ID = %d, want > 0", finalID)
+	}
+
+	err = repository.FetchTasksForExpression(expr)
+	if err != nil {
+		t.Fatalf("FetchTasksForExpression error: %v", err)
+	}
+	if len(expr.Tasks) == 0 {
+		t.Errorf("expected some tasks, got 0 for expr=%q", expr.Raw)
+	}
+	t.Logf("Planned tasks: %v", expr.Tasks)
+}
+
+func TestPlanTasks_Paren(t *testing.T) {
+	repository.Reset()
+
+	expr, err := repository.CreateExpression("(2+3)*4", testUserID)
+	if err != nil {
+		t.Fatalf("CreateExpression error: %v", err)
+	}
+
+	finalID, err := planner.PlanTasksWithNestedParen(expr.ID, expr.Raw)
+	if err != nil {
+		t.Fatalf("plan error: %v", err)
+	}
+	if finalID <= 0 {
+		t.Errorf("finalTaskID <= 0")
+	}
+	err = repository.FetchTasksForExpression(expr)
+	if err != nil {
+		t.Fatalf("FetchTasksForExpression error: %v", err)
+	}
+	if len(expr.Tasks) < 2 {
+		t.Errorf("expected at least 2 tasks for %q, got %d", expr.Raw, len(expr.Tasks))
+	}
+}
+
+func TestPlanTasks_Invalid(t *testing.T) {
+	repository.Reset()
+
+	expr, err := repository.CreateExpression("5/*2", testUserID)
+	if err != nil {
+		t.Fatalf("CreateExpression error: %v", err)
+	}
+
+	_, err = planner.PlanTasksWithNestedParen(expr.ID, expr.Raw)
+	if err == nil {
+		t.Fatal("expected error for invalid expression '5/*2', got nil")
+	}
+	t.Logf("Got expected error: %v", err)
+}

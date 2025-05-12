@@ -352,3 +352,25 @@ func floatEquals(a, b float64) bool {
 	eps := 1e-9
 	return (a-b) < eps && (b-a) < eps
 }
+
+func TestCheckInput(t *testing.T) {
+	tests := []struct {
+		input  string
+		wantOK bool
+	}{
+		{"2+2", true},
+		{"(2+3)*4", true},
+		{"2+a", false},
+		{"-2", true},
+		{"2 ^ 3", false},
+		{"(2+3 *", false},
+		{"", false},
+	}
+
+	for _, tc := range tests {
+		got := CheckInput(tc.input)
+		if got != tc.wantOK {
+			t.Errorf("CheckInput(%q) = %v, want %v", tc.input, got, tc.wantOK)
+		}
+	}
+}

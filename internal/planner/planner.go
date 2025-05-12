@@ -223,14 +223,12 @@ func rewriteUnaryMinuses(expr string) string {
 
 		if ch == '-' {
 			if isUnaryMinus(result) {
-				result = append(result, '(', '0', '-')
+				result = append(result, '0', '-')
 				i++
 				startIdx := i
+
 				for i < len(exprRunes) {
 					if isOperator(exprRunes[i]) && exprRunes[i] != '.' {
-						break
-					}
-					if exprRunes[i] == '(' || exprRunes[i] == ')' {
 						break
 					}
 					if unicode.IsSpace(exprRunes[i]) {
@@ -240,20 +238,17 @@ func rewriteUnaryMinuses(expr string) string {
 				}
 				sub := exprRunes[startIdx:i]
 				result = append(result, sub...)
-				result = append(result, ')')
 				continue
 			} else {
-				result = append(result, ch)
+				result = append(result, '-')
 				i++
 				continue
 			}
-
 		} else {
 			result = append(result, ch)
 			i++
 		}
 	}
-
 	return string(result)
 }
 
