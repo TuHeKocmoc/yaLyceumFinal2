@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	golang.org/x/crypto v0.45.0
 	google.golang.org/grpc v1.72.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
